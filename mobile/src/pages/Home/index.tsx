@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState , useEffect } from 'react';
 import { 
   Image, 
   StyleSheet , 
@@ -7,11 +7,32 @@ import {
   Text,
   TextInput,
   KeyboardAvoidingView,
-  Platform } from 'react-native';
+  Platform,
+  TouchableWithoutFeedback } from 'react-native';
 
 import { RectButton } from 'react-native-gesture-handler';  
 import { Feather as Icon } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import RNPickerSelect from 'react-native-picker-select';
+import defaultStyles from 'react-native-picker-select';
+import axios  from 'axios';
+
+const baseUrlIbge: string = `https://servicodados.ibge.gov.br/api/v1/localidades/`;
+
+interface IBGEUFResponse {
+  sigla: string
+}
+
+interface IBGEMunicipioResponse {
+  id: number;
+  nome: string;
+}
+
+interface City {
+  id: number;
+  name: string;
+}
+
 
 const Home = () => {
 
@@ -19,6 +40,40 @@ const Home = () => {
 
     const [uf , setUf ] = useState('');
     const [city , setCity ] = useState('');
+    const [ufs, setUfs] = useState<string[]>([]);
+    const [cities, setCities] = useState<City[]>([]);
+  
+
+    useEffect(()=> {
+      axios.get<IBGEUFResponse[]>(`${baseUrlIbge}estados`)
+      .then( response => {
+          const ufInitials = response.data.map(uf => uf.sigla);
+          setUfs(ufInitials);
+      })
+  },[]);
+
+
+  useEffect(()=> {
+      if(uf === "0") return;
+      
+      axios.get<IBGEMunicipioResponse[]>(`${baseUrlIbge}estados/${uf}/municipios`)
+      .then( response => {
+          const cities: City[] = response.data.map( c => ({ id: c.id , name: c.nome }));
+          setCities(cities);
+      })
+      
+  },[uf]);
+
+    const handleSelectUF = (value: string) => {
+      setUf(value);
+      console.log(value);
+      
+    }
+
+    const handleSelectCity = (value: string) => {
+      setCity(value);
+      console.log(value);
+    }
 
     function handleNavigateToPoints() {
       navigation.navigate('Points', {uf, city});
@@ -42,23 +97,24 @@ const Home = () => {
             </View>    
 
             <View style={styles.footer}> 
+              <RNPickerSelect 
+                  style={pickerSelectStyles}
+                  onValueChange={(value) => handleSelectUF(value)}
+                  placeholder = {{label: "Selecione uma UF"}}
+                  items={
+                    ufs.sort().map((uf: string) => ({ label: uf, value: uf }))
+                    }
+              />
 
-              <TextInput 
-                style  = { styles.input }
-                placeholder = "Digite a UF"
-                value={uf}
-                onChangeText={ setUf }
-                autoCorrect={false}
-                maxLength={2}
-                autoCapitalize="characters"
+              <RNPickerSelect 
+                  style={pickerSelectStyles}
+                  onValueChange={(value) => handleSelectCity(value)}
+                  placeholder = {{label: "Selecione um estado"}}
+                  items={
+                    cities.sort().map((city: City) => ({ label: city.name, value: city.name }))
+                    }
               />
-              <TextInput 
-                style  = { styles.input }
-                placeholder = "Digite a Cidade"
-                value={city}
-                autoCorrect={false}
-                onChangeText={ setCity }
-              />
+               
               <RectButton style={styles.button} onPress={ handleNavigateToPoints }>
                 <View style={styles.buttonIcon}> 
                   <Text>
@@ -106,7 +162,9 @@ const styles = StyleSheet.create({
   
     footer: {},
   
-    select: {},
+    select: {
+      backgroundColor: '#FFF'
+    },
   
     input: {
       height: 60,
@@ -145,4 +203,17 @@ const styles = StyleSheet.create({
     }
   });
 
-export default Home;
+  const pickerSelectStyles = StyleSheet.create({  
+    inputAndroid: {
+      fontSize: 16,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderWidth: 0.5,
+      borderColor: 'purple',
+      borderRadius: 8,
+      color: 'black',
+      paddingRight: 30, // to ensure the text is never behind the icon
+    },
+  }); 
+
+export default Home; 
